@@ -6,6 +6,10 @@ Offline transcription for `.mp3` and `.mp4` files using [faster-whisper](https:/
 
 The project is designed for local usage: files stay on your device and output is saved as `.txt`.
 
+## App Screenshot
+
+![First app screen](screenshots/app-first-screen.png)
+
 ## Key Features
 
 - Local transcription (offline after model download)
