@@ -413,10 +413,10 @@ class MainWindow(QMainWindow):
         self.drop_area = DropArea()
         self.drop_area.fileDropped.connect(self._set_audio_path)
 
-        browse_btn = QPushButton("Choose MP3/MP4 file")
-        browse_btn.setObjectName("secondary")
-        browse_btn.setMinimumHeight(44)
-        browse_btn.clicked.connect(self.pick_audio)
+        self.browse_button = QPushButton("Choose MP3/MP4 file")
+        self.browse_button.setObjectName("secondary")
+        self.browse_button.setMinimumHeight(44)
+        self.browse_button.clicked.connect(self.pick_audio)
 
         preset_label = QLabel("Reliability")
         preset_label.setObjectName("selectorLabel")
@@ -517,7 +517,7 @@ class MainWindow(QMainWindow):
         controls_row.setContentsMargins(0, 0, 0, 0)
         controls_row.addWidget(self.start_button, 2)
         controls_row.addWidget(self.stop_button, 1)
-        controls_row.addWidget(self.download_button, 1)
+        controls_row.addWidget(self.download_button, 2)
 
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("status")
@@ -529,7 +529,7 @@ class MainWindow(QMainWindow):
 
         root.addWidget(hero)
         root.addWidget(self.drop_area)
-        root.addWidget(browse_btn)
+        root.addWidget(self.browse_button)
         root.addLayout(selectors_row)
         root.addLayout(model_tools_row)
         root.addLayout(controls_row)
@@ -538,15 +538,17 @@ class MainWindow(QMainWindow):
         root.addStretch(1)
 
         self._apply_styles()
+        self._ensure_button_text_fits()
         self._refresh_model_status()
         self._apply_smart_fixed_size()
 
     def _apply_smart_fixed_size(self) -> None:
-        # Dimensione basata sul contenuto, limitata in modo ragionevole dallo schermo.
+        # Dimensione iniziale basata sul contenuto, con possibilità di ridimensionare.
         hint = self.sizeHint()
         screen = QGuiApplication.primaryScreen()
         if screen is None:
-            self.setFixedSize(max(hint.width(), 760), max(hint.height(), 520))
+            self.setMinimumSize(760, 520)
+            self.resize(max(hint.width(), 760), max(hint.height(), 520))
             return
 
         available = screen.availableGeometry()
@@ -555,7 +557,21 @@ class MainWindow(QMainWindow):
         max_h = int(available.height() * 0.9)
         target_w = max(min_w, min(hint.width() + 40, max_w))
         target_h = max(min_h, min(hint.height() + 40, max_h))
-        self.setFixedSize(target_w, target_h)
+        self.setMinimumSize(min_w, min_h)
+        self.resize(target_w, target_h)
+
+    def _ensure_button_text_fits(self) -> None:
+        buttons = [
+            self.browse_button,
+            self.check_models_button,
+            self.start_button,
+            self.stop_button,
+            self.download_button,
+        ]
+        for button in buttons:
+            button.ensurePolished()
+            required_width = button.sizeHint().width() + 6
+            button.setMinimumWidth(max(button.minimumWidth(), required_width))
 
     def _apply_styles(self) -> None:
         self.setStyleSheet(
