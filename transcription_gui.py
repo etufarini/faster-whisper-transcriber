@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GUI semplice (Qt) per trascrizione audio/video offline con faster-whisper."""
+"""Simple Qt GUI for offline audio/video transcription with faster-whisper."""
 
 from __future__ import annotations
 
@@ -38,8 +38,8 @@ try:
 except ModuleNotFoundError as exc:
     if exc.name == "PySide6":
         print(
-            "Dipendenza mancante: PySide6.\n"
-            "Installa con:\n"
+            "Missing dependency: PySide6.\n"
+            "Install with:\n"
             "  python3 -m pip install PySide6",
             file=sys.stderr,
         )
@@ -49,9 +49,9 @@ except ModuleNotFoundError as exc:
 from transcription_cli import transcribe_with_faster_whisper
 
 PRESETS: dict[str, tuple[str, str]] = {
-    "Alta": ("large-v3", "accurate"),
-    "Media": ("small", "balanced"),
-    "Bassa": ("base", "fast"),
+    "High": ("large-v3", "accurate"),
+    "Medium": ("small", "balanced"),
+    "Low": ("base", "fast"),
 }
 SUPPORTED_INPUT_EXTENSIONS = (".mp3", ".mp4")
 
@@ -188,7 +188,7 @@ def log_startup_error(exc: BaseException) -> None:
     log_file = app_log_path()
     log_file.parent.mkdir(parents=True, exist_ok=True)
     with log_file.open("a", encoding="utf-8") as fh:
-        fh.write("\n=== Avvio fallito ===\n")
+        fh.write("\n=== Startup failed ===\n")
         fh.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
 
 
@@ -228,7 +228,7 @@ class DropArea(QFrame):
         self.setCursor(Qt.PointingHandCursor)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
-        self.label = QLabel("Trascina qui il file MP3/MP4 (offline, resta sul tuo Mac)")
+        self.label = QLabel("Drop your MP3/MP4 file here (offline, stays on your Mac)")
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setWordWrap(True)
         layout.addWidget(self.label)
@@ -311,7 +311,7 @@ class TranscribeWorker(QObject):
                 progress_callback=self.progress.emit,
             )
             if not text:
-                raise RuntimeError("Trascrizione vuota.")
+                raise RuntimeError("Empty transcription.")
             self.finished.emit(text)
         except InterruptedError:
             self.cancelled.emit()
@@ -350,9 +350,9 @@ class ModelCheckWorker(QObject):
                 )
 
             if len(targets) > 1:
-                self.finished.emit(True, "Download modelli completato.")
+                self.finished.emit(True, "Model downloads completed.")
             else:
-                self.finished.emit(True, "Download modello completato.")
+                self.finished.emit(True, "Model download completed.")
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -388,11 +388,13 @@ class MainWindow(QMainWindow):
 
         title = QLabel("Faster Whisper Transcriber")
         title.setObjectName("title")
-        subtitle = QLabel("AI offline: trascrive MP3/MP4 in locale, senza mandare dati nel cloud.")
+        subtitle = QLabel(
+            "Offline AI: transcribes MP3/MP4 locally, without sending data to the cloud."
+        )
         subtitle.setObjectName("subtitle")
         self.requirements_label = QLabel(
-            "<b>Requisiti</b> · Minimo: macOS 12+, 8 GB RAM, ~7 GB liberi. "
-            "Consigliato per file lunghi: Apple Silicon (M1+), 16 GB RAM, preset Media/Bassa."
+            "<b>Requirements</b> · Minimum: macOS / Windows / Linux, 8 GB RAM, ~7 GB free disk. "
+            "Recommended for long files: modern 4+ core CPU (or compatible GPU), 16 GB RAM, Medium/Low preset."
         )
         self.requirements_label.setObjectName("heroRequirements")
         self.requirements_label.setWordWrap(True)
@@ -411,27 +413,27 @@ class MainWindow(QMainWindow):
         self.drop_area = DropArea()
         self.drop_area.fileDropped.connect(self._set_audio_path)
 
-        browse_btn = QPushButton("Scegli file MP3/MP4")
+        browse_btn = QPushButton("Choose MP3/MP4 file")
         browse_btn.setObjectName("secondary")
         browse_btn.setMinimumHeight(44)
         browse_btn.clicked.connect(self.pick_audio)
 
-        preset_label = QLabel("Affidabilità")
+        preset_label = QLabel("Reliability")
         preset_label.setObjectName("selectorLabel")
         self.preset_combo = QComboBox()
         self.preset_combo.setObjectName("selectorCombo")
         self.preset_combo.setFixedHeight(36)
-        self.preset_combo.addItems(["Alta", "Media", "Bassa"])
-        self.preset_combo.setCurrentText("Media")
+        self.preset_combo.addItems(["High", "Medium", "Low"])
+        self.preset_combo.setCurrentText("Medium")
         self.preset_combo.currentTextChanged.connect(self._refresh_model_status)
 
-        lang_label = QLabel("Lingua")
+        lang_label = QLabel("Language")
         lang_label.setObjectName("selectorLabel")
         self.lang_combo = QComboBox()
         self.lang_combo.setObjectName("selectorCombo")
         self.lang_combo.setFixedHeight(36)
-        self.lang_combo.addItem("Italiano", "it")
-        self.lang_combo.addItem("Inglese", "en")
+        self.lang_combo.addItem("Italian", "it")
+        self.lang_combo.addItem("English", "en")
         self.lang_combo.setCurrentIndex(0)
 
         preset_layout = QVBoxLayout()
@@ -451,9 +453,9 @@ class MainWindow(QMainWindow):
         selectors_row.addLayout(preset_layout, 1)
         selectors_row.addLayout(lang_layout, 1)
 
-        model_path_title = QLabel("Cartella modelli")
+        model_path_title = QLabel("Model folder")
         model_path_title.setObjectName("selectorLabel")
-        self.model_path_label = QLabel("<a href=\"open_models_folder\">Apri cartella modelli</a>")
+        self.model_path_label = QLabel("<a href=\"open_models_folder\">Open model folder</a>")
         self.model_path_label.setObjectName("path")
         self.model_path_label.setTextFormat(Qt.RichText)
         self.model_path_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
@@ -464,11 +466,11 @@ class MainWindow(QMainWindow):
         model_path_row.setSpacing(8)
         model_path_row.addWidget(self.model_path_label, 1)
 
-        model_status_title = QLabel("Modello")
+        model_status_title = QLabel("Model")
         model_status_title.setObjectName("selectorLabel")
-        self.model_status_label = QLabel("Stato modello: -")
+        self.model_status_label = QLabel("Model status: -")
         self.model_status_label.setObjectName("modelStatus")
-        self.check_models_button = QPushButton("Verifica modello")
+        self.check_models_button = QPushButton("Check model")
         self.check_models_button.setObjectName("secondary")
         self.check_models_button.setMinimumHeight(38)
         self.check_models_button.clicked.connect(self.check_or_download_model)
@@ -494,7 +496,7 @@ class MainWindow(QMainWindow):
         model_tools_row.addLayout(model_path_col, 1)
         model_tools_row.addLayout(model_status_col, 1)
 
-        self.start_button = QPushButton("Avvia trascrizione")
+        self.start_button = QPushButton("Start transcription")
         self.start_button.setObjectName("primary")
         self.start_button.setMinimumHeight(44)
         self.start_button.clicked.connect(self.start_transcription)
@@ -504,7 +506,7 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.stop_transcription)
         self.stop_button.setEnabled(False)
 
-        self.download_button = QPushButton("Scarica trascrizione")
+        self.download_button = QPushButton("Download transcription")
         self.download_button.setObjectName("secondary")
         self.download_button.setMinimumHeight(44)
         self.download_button.clicked.connect(self.download_transcript)
@@ -517,7 +519,7 @@ class MainWindow(QMainWindow):
         controls_row.addWidget(self.stop_button, 1)
         controls_row.addWidget(self.download_button, 1)
 
-        self.status_label = QLabel("Pronto")
+        self.status_label = QLabel("Ready")
         self.status_label.setObjectName("status")
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -784,7 +786,7 @@ class MainWindow(QMainWindow):
         if busy:
             self.progress.setRange(0, 100)
             self.progress.setValue(0)
-            self.status_label.setText("Trascrizione in corso... 0%")
+            self.status_label.setText("Transcription in progress... 0%")
         else:
             self.progress.setRange(0, 100)
             self.progress.setValue(100 if self.last_transcription_text else 0)
@@ -804,7 +806,7 @@ class MainWindow(QMainWindow):
 
     def _set_model_cache_path(self, path: Path) -> None:
         self.current_model_cache_path = path
-        self.model_path_label.setToolTip("Apri la cartella dei modelli")
+        self.model_path_label.setToolTip("Open model folder")
 
     @Slot()
     def _refresh_model_status(self) -> None:
@@ -812,9 +814,9 @@ class MainWindow(QMainWindow):
         cache_dir, available = self._resolve_model_cache(model)
         self._set_model_cache_path(cache_dir)
         if available:
-            self.model_status_label.setText("Stato modello: presente")
+            self.model_status_label.setText("Model status: available")
         else:
-            self.model_status_label.setText("Stato modello: mancante")
+            self.model_status_label.setText("Model status: missing")
         self.model_status_label.setProperty("available", available)
         self.model_status_label.style().unpolish(self.model_status_label)
         self.model_status_label.style().polish(self.model_status_label)
@@ -823,9 +825,9 @@ class MainWindow(QMainWindow):
     def pick_audio(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleziona file audio/video",
+            "Select audio/video file",
             str(Path.cwd()),
-            "Audio/Video supportati (*.mp3 *.mp4)",
+            "Supported audio/video (*.mp3 *.mp4)",
         )
         if not path:
             return
@@ -835,24 +837,24 @@ class MainWindow(QMainWindow):
     def _set_audio_path(self, path: str) -> None:
         selected = Path(path)
         self.audio_path = selected
-        self.drop_area.set_text(f"File selezionato:\n{selected.name}")
+        self.drop_area.set_text(f"Selected file:\n{selected.name}")
         self.status_label.setText(f"Output: {selected.with_suffix('.txt').name}")
 
     @Slot()
     def start_transcription(self) -> None:
         if self.thread and self.thread.isRunning():
-            self._show_themed_info("In corso", "Una trascrizione e gia in esecuzione.")
+            self._show_themed_info("In progress", "A transcription is already running.")
             return
 
         if self.audio_path is None:
             self._show_themed_error(
-                "Input mancante",
-                "Carica un file MP3 o MP4 (drag & drop o pulsante).",
+                "Missing input",
+                "Load an MP3 or MP4 file (drag & drop or button).",
             )
             return
 
         if not self.audio_path.exists():
-            self._show_themed_error("File non trovato", f"File non trovato:\n{self.audio_path}")
+            self._show_themed_error("File not found", f"File not found:\n{self.audio_path}")
             return
 
         preset_name, model, mode = self._selected_model()
@@ -860,8 +862,8 @@ class MainWindow(QMainWindow):
         model_cache, available = self._resolve_model_cache(model)
         if not available:
             self._show_themed_error(
-                "Modello mancante",
-                "Il modello selezionato non e presente.\nUsa 'Verifica modelli' prima di avviare.",
+                "Model missing",
+                "The selected model is not available.\nUse 'Check model' before starting.",
             )
             self._refresh_model_status()
             return
@@ -900,17 +902,17 @@ class MainWindow(QMainWindow):
         self.worker.request_cancel()
         self.thread.quit()
         self.stop_button.setEnabled(False)
-        self.status_label.setText("Arresto in corso...")
+        self.status_label.setText("Stopping...")
 
     @Slot(str)
     def _on_done(self, transcript_text: str) -> None:
         self.last_transcription_text = transcript_text
         self.download_button.setEnabled(True)
         suggested_name = self.last_output_path.name if self.last_output_path else "file.txt"
-        self.status_label.setText("Trascrizione completata (non ancora salvata)")
+        self.status_label.setText("Transcription completed (not saved yet)")
         self._show_themed_info(
-            "Completato",
-            f"Trascrizione completata.\nUsa 'Scarica trascrizione' per salvarla (suggerito: {suggested_name}).",
+            "Completed",
+            f"Transcription completed.\nUse 'Download transcription' to save it (suggested: {suggested_name}).",
             success=True,
         )
         self._clear_worker()
@@ -918,22 +920,22 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _on_error(self, error_text: str) -> None:
-        self.status_label.setText("Errore durante la trascrizione")
-        self._show_themed_error("Errore", error_text)
+        self.status_label.setText("Error during transcription")
+        self._show_themed_error("Error", error_text)
         self._clear_worker()
         self._refresh_model_status()
 
     @Slot()
     def _on_cancelled(self) -> None:
-        self.status_label.setText("Trascrizione interrotta")
-        self._show_themed_info("Interrotta", "Trascrizione interrotta dall'utente.")
+        self.status_label.setText("Transcription stopped")
+        self._show_themed_info("Stopped", "Transcription stopped by the user.")
         self._clear_worker()
 
     @Slot(int)
     def _on_progress(self, value: int) -> None:
         bounded = max(0, min(100, value))
         self.progress.setValue(bounded)
-        self.status_label.setText(f"Trascrizione in corso... {bounded}%")
+        self.status_label.setText(f"Transcription in progress... {bounded}%")
 
     def _set_model_check_busy(self, busy: bool, status_text: str, progress_value: int | None = None) -> None:
         self.start_button.setEnabled(not busy)
@@ -963,7 +965,7 @@ class MainWindow(QMainWindow):
         if self.model_thread:
             try:
                 if self.model_thread.isRunning():
-                    self._show_themed_info("In corso", "Verifica modelli gia in esecuzione.")
+                    self._show_themed_info("In progress", "Model check is already running.")
                     return
             except RuntimeError:
                 self.model_thread = None
@@ -975,8 +977,8 @@ class MainWindow(QMainWindow):
         if available:
             self._refresh_model_status()
             self._show_themed_info(
-                "Modello presente",
-                "Il modello selezionato e gia disponibile.",
+                "Model available",
+                "The selected model is already available.",
                 success=True,
             )
             return
@@ -991,7 +993,7 @@ class MainWindow(QMainWindow):
         self.model_worker.failed.connect(self.model_thread.quit)
         self.model_thread.finished.connect(self.model_thread.deleteLater)
 
-        self._set_model_check_busy(True, "Download modello in corso...")
+        self._set_model_check_busy(True, "Model download in progress...")
         self.model_thread.start()
 
     @Slot(bool, str)
@@ -999,14 +1001,14 @@ class MainWindow(QMainWindow):
         self._set_model_check_busy(False, message, progress_value=100)
         self._refresh_model_status()
         self._clear_model_worker()
-        self._show_themed_info("Modelli", message, success=True)
+        self._show_themed_info("Models", message, success=True)
 
     @Slot(str)
     def _on_model_check_error(self, error_text: str) -> None:
-        self._set_model_check_busy(False, "Errore durante verifica modelli", progress_value=0)
+        self._set_model_check_busy(False, "Error during model check", progress_value=0)
         self._refresh_model_status()
         self._clear_model_worker()
-        self._show_themed_error("Errore verifica modelli", error_text)
+        self._show_themed_error("Model check error", error_text)
 
     @Slot()
     def open_model_folder(self) -> None:
@@ -1018,13 +1020,13 @@ class MainWindow(QMainWindow):
     @Slot()
     def download_transcript(self) -> None:
         if not self.last_transcription_text or not self.last_output_path:
-            self._show_themed_info("Nessuna trascrizione", "Esegui prima una trascrizione.")
+            self._show_themed_info("No transcription", "Run a transcription first.")
             return
 
         suggested = str(self.last_output_path)
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Scarica trascrizione",
+            "Download transcription",
             suggested,
             "Text (*.txt)",
         )
@@ -1035,7 +1037,7 @@ class MainWindow(QMainWindow):
         if save_path.suffix.lower() != ".txt":
             save_path = save_path.with_suffix(".txt")
         save_path.write_text(self.last_transcription_text + "\n", encoding="utf-8")
-        self._show_themed_info("Salvato", f"Trascrizione scaricata in:\n{save_path}", success=True)
+        self._show_themed_info("Saved", f"Transcription saved to:\n{save_path}", success=True)
 
     def _clear_worker(self) -> None:
         # Resetta thread/worker cosi lo start riparte sempre.
@@ -1050,8 +1052,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         if self.thread and self.thread.isRunning():
             self._show_themed_info(
-                "Trascrizione in corso",
-                "Attendi la fine della trascrizione prima di chiudere l'app.",
+                "Transcription in progress",
+                "Wait for transcription to finish before closing the app.",
             )
             event.ignore()
             return
@@ -1064,8 +1066,8 @@ class MainWindow(QMainWindow):
                 self.model_worker = None
         if model_thread_running:
             self._show_themed_info(
-                "Verifica modelli in corso",
-                "Attendi la fine della verifica modelli prima di chiudere l'app.",
+                "Model check in progress",
+                "Wait for model check to finish before closing the app.",
             )
             event.ignore()
             return
@@ -1092,8 +1094,8 @@ def main() -> int:
         try:
             QMessageBox.critical(
                 None,
-                "Errore avvio app",
-                f"L'app non e riuscita ad avviarsi.\nDettagli: {app_log_path()}",
+                "App startup error",
+                f"The app could not start.\nDetails: {app_log_path()}",
             )
         except Exception:
             pass
