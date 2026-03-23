@@ -1,4 +1,4 @@
-# Trascrizione MP3 Offline (faster-whisper)
+# Trascrizione MP3/MP4 Offline (faster-whisper)
 
 Script CLI: `transcription_cli.py`  
 GUI desktop: `transcription_gui.py`  
@@ -25,7 +25,7 @@ python3 transcription_gui.py
 ```
 
 Dalla GUI puoi:
-- caricare MP3 con `drag & drop` oppure pulsante
+- caricare file MP3/MP4 con `drag & drop` oppure pulsante
 - scegliere affidabilita' `Alta`, `Media`, `Bassa`
 - vedere il `modello in uso` in base al preset selezionato
 - vedere/aprire il percorso della cartella modelli
@@ -40,7 +40,7 @@ Mappatura affidabilita' (come i 3 profili del README):
 
 ## Uso CLI
 
-Se nella cartella c'e' un solo `.mp3`:
+Se nella cartella c'e' un solo file supportato (`.mp3` o `.mp4`):
 
 ```bash
 python3 transcription_cli.py
@@ -70,7 +70,7 @@ python3 transcription_cli.py --model large-v3 --mode accurate --lang it
 
 ## Parametri principali CLI
 
-- `--input "file.mp3"`: specifica il file audio
+- `--input "file.mp3|file.mp4"`: specifica il file audio/video
 - `--output "output.txt"`: specifica il file di output
 - `--lang it`: lingua (es. `it`, `en`)
 - `--prompt "testo"`: contesto per migliorare termini specifici
@@ -81,16 +81,10 @@ python3 transcription_cli.py --model large-v3 --mode accurate --lang it
 
 ## Build eseguibile macOS (.app)
 
-Dal root del progetto:
+Dal root del progetto (usa lo spec che include icona `.icns` e `app_icon.png`):
 
 ```bash
-PYINSTALLER_CONFIG_DIR=.pyinstaller pyinstaller -y \
-  --windowed \
-  --name FasterWhisperTranscriber \
-  --collect-all faster_whisper \
-  --collect-all ctranslate2 \
-  --collect-all tokenizers \
-  transcription_gui.py
+PYINSTALLER_CONFIG_DIR=.pyinstaller python3 -m PyInstaller -y faster_whisper_transcriber.spec
 
 mkdir -p "dist/Faster Whisper Transcriber.app/Contents/Frameworks/models"
 cp -R "models/faster-whisper" "dist/Faster Whisper Transcriber.app/Contents/Frameworks/models/faster-whisper"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Trascrizione MP3 offline con faster-whisper.
+Trascrizione audio/video offline con faster-whisper.
 
 Pensato per essere leggero e veloce su CPU, senza dipendenze cloud.
 
@@ -37,16 +37,23 @@ def is_cancel_requested(cancel_check: Optional[Callable[[], bool]]) -> bool:
     return bool(cancel_check and cancel_check())
 
 
-def find_single_mp3(cwd: Path) -> Path:
-    mp3_files = sorted(cwd.glob("*.mp3"))
-    if not mp3_files:
-        raise FileNotFoundError("Nessun file .mp3 trovato nella cartella corrente.")
-    if len(mp3_files) > 1:
-        names = ", ".join(p.name for p in mp3_files)
-        raise RuntimeError(
-            f"Trovati più file .mp3 ({names}). Usa --input per specificarne uno."
+SUPPORTED_INPUT_EXTENSIONS = (".mp3", ".mp4")
+
+
+def find_single_audio_file(cwd: Path) -> Path:
+    candidates = sorted(
+        p for p in cwd.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_INPUT_EXTENSIONS
+    )
+    if not candidates:
+        raise FileNotFoundError(
+            "Nessun file audio/video supportato trovato nella cartella corrente (.mp3, .mp4)."
         )
-    return mp3_files[0]
+    if len(candidates) > 1:
+        names = ", ".join(p.name for p in candidates)
+        raise RuntimeError(
+            f"Trovati più file supportati ({names}). Usa --input per specificarne uno."
+        )
+    return candidates[0]
 
 
 def transcribe_with_faster_whisper(
@@ -127,19 +134,19 @@ def transcribe_with_faster_whisper(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Trascrive un file MP3 offline con faster-whisper."
+        description="Trascrive un file audio/video (.mp3, .mp4) offline con faster-whisper."
     )
     parser.add_argument(
         "--input",
         type=Path,
         default=None,
-        help="Percorso del file MP3 (se omesso, cerca un solo .mp3 nella cartella).",
+        help="Percorso del file (.mp3, .mp4). Se omesso, cerca un solo file supportato nella cartella.",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="Percorso file di output .txt (default: stesso nome del mp3).",
+        help="Percorso file di output .txt (default: stesso nome del file input).",
     )
     parser.add_argument(
         "--lang",
@@ -181,7 +188,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        audio_path = args.input if args.input else find_single_mp3(Path.cwd())
+        audio_path = args.input if args.input else find_single_audio_file(Path.cwd())
     except (FileNotFoundError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

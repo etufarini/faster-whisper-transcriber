@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GUI semplice (Qt) per trascrizione MP3 offline con faster-whisper."""
+"""GUI semplice (Qt) per trascrizione audio/video offline con faster-whisper."""
 
 from __future__ import annotations
 
@@ -53,6 +53,7 @@ PRESETS: dict[str, tuple[str, str]] = {
     "Media": ("small", "balanced"),
     "Bassa": ("base", "fast"),
 }
+SUPPORTED_INPUT_EXTENSIONS = (".mp3", ".mp4")
 
 
 def user_model_cache_dir() -> Path:
@@ -227,7 +228,7 @@ class DropArea(QFrame):
         self.setCursor(Qt.PointingHandCursor)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
-        self.label = QLabel("Trascina qui il file MP3 (offline, resta sul tuo Mac)")
+        self.label = QLabel("Trascina qui il file MP3/MP4 (offline, resta sul tuo Mac)")
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setWordWrap(True)
         layout.addWidget(self.label)
@@ -236,7 +237,7 @@ class DropArea(QFrame):
         self.label.setText(text)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
-        if self._first_mp3_path(event) is not None:
+        if self._first_supported_path(event) is not None:
             event.acceptProposedAction()
             self.setProperty("active", True)
             self.style().polish(self)
@@ -244,7 +245,7 @@ class DropArea(QFrame):
             event.ignore()
 
     def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
-        path = self._first_mp3_path(event)
+        path = self._first_supported_path(event)
         if path is None:
             event.ignore()
             return
@@ -257,13 +258,13 @@ class DropArea(QFrame):
         self.setProperty("active", False)
         self.style().polish(self)
 
-    def _first_mp3_path(self, event: QDragEnterEvent | QDropEvent) -> str | None:
+    def _first_supported_path(self, event: QDragEnterEvent | QDropEvent) -> str | None:
         urls = event.mimeData().urls()
         for url in urls:
             if not url.isLocalFile():
                 continue
             file_path = url.toLocalFile()
-            if file_path.lower().endswith(".mp3"):
+            if Path(file_path).suffix.lower() in SUPPORTED_INPUT_EXTENSIONS:
                 return file_path
         return None
 
@@ -387,11 +388,11 @@ class MainWindow(QMainWindow):
 
         title = QLabel("Faster Whisper Transcriber")
         title.setObjectName("title")
-        subtitle = QLabel("AI offline: trascrive MP3 in locale, senza mandare dati nel cloud.")
+        subtitle = QLabel("AI offline: trascrive MP3/MP4 in locale, senza mandare dati nel cloud.")
         subtitle.setObjectName("subtitle")
         self.requirements_label = QLabel(
             "<b>Requisiti</b> · Minimo: macOS 12+, 8 GB RAM, ~7 GB liberi. "
-            "Consigliato per MP3 lunghi: Apple Silicon (M1+), 16 GB RAM, preset Media/Bassa."
+            "Consigliato per file lunghi: Apple Silicon (M1+), 16 GB RAM, preset Media/Bassa."
         )
         self.requirements_label.setObjectName("heroRequirements")
         self.requirements_label.setWordWrap(True)
@@ -410,7 +411,7 @@ class MainWindow(QMainWindow):
         self.drop_area = DropArea()
         self.drop_area.fileDropped.connect(self._set_audio_path)
 
-        browse_btn = QPushButton("Scegli file MP3")
+        browse_btn = QPushButton("Scegli file MP3/MP4")
         browse_btn.setObjectName("secondary")
         browse_btn.setMinimumHeight(44)
         browse_btn.clicked.connect(self.pick_audio)
@@ -820,7 +821,12 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def pick_audio(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Seleziona MP3", str(Path.cwd()), "MP3 (*.mp3)")
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleziona file audio/video",
+            str(Path.cwd()),
+            "Audio/Video supportati (*.mp3 *.mp4)",
+        )
         if not path:
             return
         self._set_audio_path(path)
@@ -839,7 +845,10 @@ class MainWindow(QMainWindow):
             return
 
         if self.audio_path is None:
-            self._show_themed_error("Input mancante", "Carica un file MP3 (drag & drop o pulsante).")
+            self._show_themed_error(
+                "Input mancante",
+                "Carica un file MP3 o MP4 (drag & drop o pulsante).",
+            )
             return
 
         if not self.audio_path.exists():
