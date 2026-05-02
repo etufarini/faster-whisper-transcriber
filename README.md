@@ -7,16 +7,6 @@ Project priorities:
 - Simple, user-friendly GUI
 - Optional CLI mode for automation
 
-## GUI Preview
-
-<p align="center">
-  <a href="screenshots/app-first-screen.png">
-    <img src="screenshots/app-first-screen.png" alt="Faster Whisper Transcriber GUI" width="860" />
-  </a>
-</p>
-
-Click the screenshot to open the full-resolution image.
-
 ## Why Use the GUI
 
 - No cloud upload: fully local processing
