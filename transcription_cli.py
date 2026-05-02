@@ -1,138 +1,23 @@
 #!/usr/bin/env python3
 """
-Trascrizione audio/video offline con faster-whisper.
+transcription_cli.py
 
-Pensato per essere leggero e veloce su CPU, senza dipendenze cloud.
-
-Uso:
-  python3 transcription_cli.py
-  python3 transcription_cli.py --mode fast --model small --lang it
-
-Dipendenze:
-  pip install faster-whisper
+Command-line entry point for local audio/video transcription with faster-whisper.
+This file keeps argument parsing and output handling separate from the shared
+transcription engine in `transcription_core.py`.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+
+from transcription_core import find_single_audio_file, transcribe_with_faster_whisper
 
 
-AUDIO_SAMPLE_RATE = 16000
-MODE_DECODING_PARAMS: dict[str, tuple[int, int, int, list[float]]] = {
-    "fast": (2, 2, 1, [0.0]),
-    "balanced": (5, 5, 1, [0.0, 0.2]),
-    "accurate": (8, 8, 2, [0.0, 0.2, 0.4]),
-}
-
-
-def get_mode_decoding_params(mode: str) -> tuple[int, int, int, list[float]]:
-    return MODE_DECODING_PARAMS.get(mode, MODE_DECODING_PARAMS["balanced"])
-
-
-def is_cancel_requested(cancel_check: Optional[Callable[[], bool]]) -> bool:
-    return bool(cancel_check and cancel_check())
-
-
-SUPPORTED_INPUT_EXTENSIONS = (".mp3", ".mp4")
-
-
-def find_single_audio_file(cwd: Path) -> Path:
-    candidates = sorted(
-        p for p in cwd.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_INPUT_EXTENSIONS
-    )
-    if not candidates:
-        raise FileNotFoundError(
-            "Nessun file audio/video supportato trovato nella cartella corrente (.mp3, .mp4)."
-        )
-    if len(candidates) > 1:
-        names = ", ".join(p.name for p in candidates)
-        raise RuntimeError(
-            f"Trovati più file supportati ({names}). Usa --input per specificarne uno."
-        )
-    return candidates[0]
-
-
-def transcribe_with_faster_whisper(
-    audio_path: Path,
-    language: Optional[str],
-    prompt: Optional[str],
-    model_name: str,
-    mode: str,
-    model_cache_dir: Path,
-    local_files_only: bool,
-    cancel_check: Optional[Callable[[], bool]] = None,
-    progress_callback: Optional[Callable[[int], None]] = None,
-) -> str:
-    import numpy as np
-    from faster_whisper.audio import decode_audio  # type: ignore
-    from faster_whisper import WhisperModel  # type: ignore
-
-    device = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu"
-    compute_type = "float16" if device == "cuda" else "int8_float32"
-    model = WhisperModel(
-        model_name,
-        device=device,
-        compute_type=compute_type,
-        download_root=str(model_cache_dir),
-        local_files_only=local_files_only,
-    )
-    if is_cancel_requested(cancel_check):
-        raise InterruptedError("Trascrizione interrotta.")
-
-    beam_size, best_of, patience, temperatures = get_mode_decoding_params(mode)
-
-    # Decodifica e sanitizzazione difensiva: alcuni file possono arrivare
-    # con ampiezze fuori scala e innescare overflow nel mel spectrogram.
-    raw_audio = decode_audio(str(audio_path), sampling_rate=AUDIO_SAMPLE_RATE)
-    audio = np.asarray(raw_audio, dtype=np.float32)
-    audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
-    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
-    if peak > 1.0:
-        audio = audio / peak
-    audio = np.clip(audio, -1.0, 1.0)
-    duration_sec = float(audio.shape[0]) / float(AUDIO_SAMPLE_RATE) if audio.size else 0.0
-    last_reported = -1
-    if progress_callback:
-        progress_callback(0)
-
-    segments, _info = model.transcribe(
-        audio,
-        language=language,
-        initial_prompt=prompt,
-        beam_size=beam_size,
-        best_of=best_of,
-        patience=patience,
-        temperature=temperatures,
-        condition_on_previous_text=True,
-        vad_filter=True,
-        vad_parameters={"min_silence_duration_ms": 400},
-        word_timestamps=False,
-    )
-
-    parts: list[str] = []
-    for segment in segments:
-        if is_cancel_requested(cancel_check):
-            raise InterruptedError("Trascrizione interrotta.")
-        if progress_callback and duration_sec > 0:
-            progress = int(min(100.0, max(0.0, (float(segment.end) / duration_sec) * 100.0)))
-            if progress != last_reported:
-                last_reported = progress
-                progress_callback(progress)
-        text = segment.text.strip()
-        if text:
-            parts.append(text)
-    if is_cancel_requested(cancel_check):
-        raise InterruptedError("Trascrizione interrotta.")
-    if progress_callback and last_reported < 100:
-        progress_callback(100)
-    return "\n".join(parts).strip()
-
-
-def main() -> int:
+# Build the CLI parser while keeping the accepted flags explicit and local.
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Trascrive un file audio/video (.mp3, .mp4) offline con faster-whisper."
     )
@@ -185,10 +70,23 @@ def main() -> int:
         action="store_true",
         help="Stampa la trascrizione su stdout per copiarla fuori dalla CLI.",
     )
+    return parser
+
+
+# Resolve the input file from the CLI flags or the current working directory.
+def resolve_input_audio_path(input_path: Path | None) -> Path:
+    if input_path is not None:
+        return input_path
+    return find_single_audio_file(Path.cwd())
+
+
+# Run one CLI transcription and return a process exit code.
+def main() -> int:
+    parser = build_argument_parser()
     args = parser.parse_args()
 
     try:
-        audio_path = args.input if args.input else find_single_audio_file(Path.cwd())
+        audio_path = resolve_input_audio_path(args.input)
     except (FileNotFoundError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

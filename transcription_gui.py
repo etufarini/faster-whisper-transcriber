@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Simple Qt GUI for offline audio/video transcription with faster-whisper."""
+"""
+transcription_gui.py
+
+Qt desktop interface for local audio/video transcription with faster-whisper.
+This file owns the GUI workflow and delegates transcription/model-cache work to
+`transcription_core.py` so the UI code stays focused on user interaction.
+"""
 
 from __future__ import annotations
 
@@ -46,16 +52,21 @@ except ModuleNotFoundError as exc:
         raise SystemExit(1)
     raise
 
-from transcription_cli import transcribe_with_faster_whisper
+from transcription_core import (
+    SUPPORTED_INPUT_EXTENSIONS,
+    download_missing_models,
+    model_exists_in_cache,
+    transcribe_with_faster_whisper,
+)
 
 PRESETS: dict[str, tuple[str, str]] = {
     "High": ("large-v3", "accurate"),
     "Medium": ("small", "balanced"),
     "Low": ("base", "fast"),
 }
-SUPPORTED_INPUT_EXTENSIONS = (".mp3", ".mp4")
 
 
+# Return the per-user cache directory used by the GUI for downloaded models.
 def user_model_cache_dir() -> Path:
     return (
         Path.home()
@@ -67,10 +78,12 @@ def user_model_cache_dir() -> Path:
     )
 
 
+# Return the startup log file used when the GUI fails before it can show a dialog.
 def app_log_path() -> Path:
     return Path.home() / "Library" / "Logs" / "faster_whisper_transcriber" / "startup.log"
 
 
+# Return the best icon path for source runs and frozen application bundles.
 def app_icon_path() -> Path | None:
     candidates: list[Path] = [Path(__file__).resolve().parent / "resources" / "app_icon.png"]
     if getattr(sys, "frozen", False):
@@ -184,6 +197,7 @@ class AnimatedRobotBadge(QWidget):
         painter.drawEllipse(QRectF(13.1, 7.2, 0.9, 0.9))
 
 
+# Persist a startup failure traceback to disk so frozen builds remain diagnosable.
 def log_startup_error(exc: BaseException) -> None:
     log_file = app_log_path()
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -192,6 +206,7 @@ def log_startup_error(exc: BaseException) -> None:
         fh.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
 
 
+# Return the first bundled model cache directory that exists inside a frozen app.
 def bundled_model_cache_dir() -> Path | None:
     if not getattr(sys, "frozen", False):
         return None
@@ -210,11 +225,6 @@ def bundled_model_cache_dir() -> Path | None:
         if candidate.exists():
             return candidate
     return None
-
-
-def model_exists_in_cache(model_name: str, cache_dir: Path) -> bool:
-    repo_dir = cache_dir / f"models--Systran--faster-whisper-{model_name}"
-    return repo_dir.exists()
 
 
 class DropArea(QFrame):
@@ -333,21 +343,7 @@ class ModelCheckWorker(QObject):
     def run(self) -> None:
         try:
             targets = self.models if self.models else [self.model]
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-            for target in targets:
-                if model_exists_in_cache(target, self.cache_dir):
-                    continue
-
-                from faster_whisper import WhisperModel  # type: ignore
-
-                _ = WhisperModel(
-                    target,
-                    device="cpu",
-                    compute_type="int8_float32",
-                    download_root=str(self.cache_dir),
-                    local_files_only=False,
-                )
+            download_missing_models(targets, self.cache_dir)
 
             if len(targets) > 1:
                 self.finished.emit(True, "Model downloads completed.")
