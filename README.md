@@ -13,14 +13,6 @@ Core properties:
 - explicit model download and cache paths;
 - simple preset-based operation.
 
-## Screenshot
-
-<p align="center">
-  <a href="screenshots/app-first-screen.png">
-    <img src="screenshots/app-first-screen.png" alt="Faster Whisper Transcriber GUI" width="860" />
-  </a>
-</p>
-
 ## Requirements
 
 - Python `3.10+`
