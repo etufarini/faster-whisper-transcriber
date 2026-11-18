@@ -58,6 +58,34 @@ class EngineTests(unittest.TestCase):
             self.assertEqual(len(output.getvalue().splitlines()), 1)
             self.assertEqual(json.loads(output.getvalue())["text"], "caffè\nsecond line")
 
+    # Real Hub header selection must bypass expired credentials for checks and downloads.
+    def test_public_download_ignores_expired_personal_credentials(self):
+        from huggingface_hub.utils import build_hf_headers
+
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary)
+            snapshot = cache / "snapshot"
+            snapshot.mkdir()
+            network_requests = []
+
+            # Replace network/cache transport while retaining faster-whisper's token forwarding.
+            def public_snapshot(repo_id, **options):
+                headers = build_hf_headers(token=options.get("token"))
+                self.assertNotIn("authorization", headers)
+                if not options["local_files_only"]:
+                    network_requests.append(repo_id)
+                    for name, contents in {"model.bin": "fixture", "config.json": "{}", "tokenizer.json": "{}", "vocabulary.json": "[]"}.items():
+                        (snapshot / name).write_text(contents)
+                return str(snapshot)
+
+            with patch.dict("os.environ", {"HF_TOKEN": "synthetic-expired-token"}), patch("huggingface_hub.constants.HF_HUB_DISABLE_IMPLICIT_TOKEN", False), patch("huggingface_hub.utils._headers.get_token", side_effect=RuntimeError("OAuth token has expired")) as credentials, patch("huggingface_hub.snapshot_download", side_effect=public_snapshot):
+                self.assertFalse(core.model_exists_in_cache("small", cache))
+                core.download_missing_models(["small"], cache)
+                self.assertTrue(core.model_exists_in_cache("small", cache))
+                core.download_missing_models(["small"], cache)
+                self.assertEqual(network_requests, ["Systran/faster-whisper-small"])
+                credentials.assert_not_called()
+
     # Invalid envelopes and paths fail before any inference library is invoked.
     def test_request_validation(self):
         with tempfile.TemporaryDirectory() as temporary:

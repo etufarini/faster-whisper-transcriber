@@ -68,6 +68,8 @@ working-directory cache unless `--model-cache-dir` is supplied.
 
 Only explicit model downloads contact the model host. Inspection/transcription
 use local-files-only and worker offline mode. Telemetry is disabled in the worker.
+Desktop model downloads are anonymous: they do not read or refresh personal
+Hugging Face credentials, so an expired login cannot block a public preset model.
 Audio paths and transcripts are not sent to a cloud transcription service. The
 renderer loads local assets without external fonts or scripts. Worker diagnostics
 are bounded and appear on failure; source development may print errors in its
@@ -105,6 +107,10 @@ input/transcription/storage failure, and 2 for empty output.
   installation. Do not remove user caches to fix development dependencies.
 - **Model missing after an interrupted download:** use **Download model** again.
   The application verifies required files in the referenced local snapshot.
+- **Expired Hugging Face token / 401 for a preset model:** the desktop uses anonymous
+  downloads and needs no login. Restart after updating the source, or rebuild an
+  older packaged application to include the corrected engine. Personal credentials
+  remain available to CLI downloads of private models.
 - **CUDA initialization failure:** CPU works without a GPU. CUDA execution needs
   the libraries required by the pinned CTranslate2 build; hardware and driver
   integration are separate from normal UI tests. If CUDA model initialization

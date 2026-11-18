@@ -59,7 +59,9 @@ def local_model_path(model_name: str, cache_dir: Path) -> Path | None:
     from huggingface_hub.errors import LocalEntryNotFoundError
 
     try:
-        snapshot = Path(download_model(model_name, cache_dir=str(cache_dir), local_files_only=True))
+        snapshot = Path(download_model(
+            model_name, cache_dir=str(cache_dir), local_files_only=True, use_auth_token=False,
+        ))
     except (LocalEntryNotFoundError, FileNotFoundError):
         return None
     required = [snapshot / name for name in ("model.bin", "config.json", "tokenizer.json")]
@@ -80,7 +82,7 @@ def model_exists_in_cache(model_name: str, cache_dir: Path) -> bool:
     return local_model_path(model_name, cache_dir) is not None
 
 
-# Download model files explicitly without loading weights or initializing a device.
+# Download public model files anonymously so expired personal sessions cannot block them.
 def download_missing_models(model_names: Sequence[str], cache_dir: Path) -> None:
     from faster_whisper.utils import download_model
 
@@ -88,7 +90,9 @@ def download_missing_models(model_names: Sequence[str], cache_dir: Path) -> None
     for model_name in model_names:
         if model_exists_in_cache(model_name, cache_dir):
             continue
-        download_model(model_name, cache_dir=str(cache_dir), local_files_only=False)
+        download_model(
+            model_name, cache_dir=str(cache_dir), local_files_only=False, use_auth_token=False,
+        )
         if not model_exists_in_cache(model_name, cache_dir):
             raise RuntimeError(f"The downloaded model is incomplete: {model_name}")
 
