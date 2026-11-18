@@ -1,0 +1,5 @@
+{
+  "High": { "model": "large-v3", "mode": "accurate" },
+  "Medium": { "model": "small", "mode": "balanced" },
+  "Low": { "model": "base", "mode": "fast" }
+}

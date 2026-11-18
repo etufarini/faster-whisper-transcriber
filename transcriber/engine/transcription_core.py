@@ -9,7 +9,7 @@ stay small, explicit, and easy to reason about.
 
 from __future__ import annotations
 
-import os
+import json
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -52,27 +52,55 @@ def find_single_audio_file(cwd: Path) -> Path:
     return candidates[0]
 
 
-# Return True when the faster-whisper cache already contains the requested model.
+# Resolve a complete local snapshot without permitting a network request.
+def local_model_path(model_name: str, cache_dir: Path) -> Path | None:
+    from faster_whisper.utils import download_model
+    from huggingface_hub.errors import LocalEntryNotFoundError
+
+    try:
+        snapshot = Path(download_model(model_name, cache_dir=str(cache_dir), local_files_only=True))
+    except (LocalEntryNotFoundError, FileNotFoundError):
+        return None
+    required = [snapshot / name for name in ("model.bin", "config.json", "tokenizer.json")]
+    if not all(path.is_file() and path.stat().st_size > 0 for path in required):
+        return None
+    if not any(path.is_file() and path.stat().st_size > 0 for path in snapshot.glob("vocabulary.*")):
+        return None
+    for name in ("config.json", "tokenizer.json"):
+        try:
+            json.loads((snapshot / name).read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            return None
+    return snapshot
+
+
+# Reject cache directories whose referenced snapshot is missing required files.
 def model_exists_in_cache(model_name: str, cache_dir: Path) -> bool:
-    repo_dir = cache_dir / f"models--Systran--faster-whisper-{model_name}"
-    return repo_dir.exists()
+    return local_model_path(model_name, cache_dir) is not None
 
 
-# Download each missing model by constructing it once through faster-whisper.
+# Download model files explicitly without loading weights or initializing a device.
 def download_missing_models(model_names: Sequence[str], cache_dir: Path) -> None:
-    from faster_whisper import WhisperModel  # type: ignore
+    from faster_whisper.utils import download_model
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     for model_name in model_names:
         if model_exists_in_cache(model_name, cache_dir):
             continue
-        _ = WhisperModel(
-            model_name,
-            device="cpu",
-            compute_type="int8_float32",
-            download_root=str(cache_dir),
-            local_files_only=False,
-        )
+        download_model(model_name, cache_dir=str(cache_dir), local_files_only=False)
+        if not model_exists_in_cache(model_name, cache_dir):
+            raise RuntimeError(f"The downloaded model is incomplete: {model_name}")
+
+
+# Query the inference library instead of treating visibility variables as a GPU probe.
+def transcription_device() -> tuple[str, str]:
+    import ctranslate2
+
+    try:
+        cuda = ctranslate2.get_cuda_device_count() > 0
+    except RuntimeError:
+        cuda = False
+    return ("cuda", "float16") if cuda else ("cpu", "int8_float32")
 
 
 # Decode audio and normalize amplitudes before computing the mel spectrogram.
@@ -104,8 +132,7 @@ def transcribe_with_faster_whisper(
 ) -> str:
     from faster_whisper import WhisperModel  # type: ignore
 
-    device = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu"
-    compute_type = "float16" if device == "cuda" else "int8_float32"
+    device, compute_type = transcription_device()
     model = WhisperModel(
         model_name,
         device=device,
