@@ -6,6 +6,8 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "faster-whisper==1.2.1",
+    # faster-whisper 1.2.1 passes metadata_errors, removed by PyAV 19.
+    "av>=18,<19",
     "numpy==2.5.5",
     "onnxruntime==1.23.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]

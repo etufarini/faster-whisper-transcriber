@@ -111,8 +111,9 @@ http://127.0.0.1:1420/?scenario=save-error
 ```
 
 All are labelled simulations. They do not prove inference quality or native
-dialog behavior. Python tests exercise actual local Hub snapshot resolution and
-normalization without model weights or network access. The upstream contracts are
+dialog behavior. Python tests exercise actual local Hub snapshot resolution,
+normalization and decoding of generated MP3/MP4 files without model weights or
+network access. The upstream contracts are
 [faster-whisper 1.2.1](https://github.com/SYSTRAN/faster-whisper/tree/v1.2.1),
 [Tauri IPC channels](https://v2.tauri.app/develop/calling-frontend/#channels) and
 [PyInstaller onedir bundles](https://pyinstaller.org/en/stable/operating-mode.html).
@@ -125,6 +126,10 @@ the latter deliberately with `uv pip compile engine/pyproject.toml --extra packa
 from `transcriber/`; uv is a maintainer tool, not an installation prerequisite.
 Intel macOS pins ONNX Runtime 1.23.2 because newer releases lack Intel wheels.
 The application minimum is macOS 14 because of the pinned ARM64 media wheels.
+Keep PyAV below 19 while using faster-whisper 1.2.1: its decoder still passes
+`metadata_errors` to `av.open`. The real MP3/MP4 decoding test must pass before
+lifting this compatibility constraint, even when dependency resolution succeeds.
+See the [PyAV 19 API removals](https://github.com/PyAV-Org/PyAV/blob/v19.0.2/CHANGELOG.rst).
 
 Review `npm audit`, `npm outdated` and `npm ls --all` after dependency updates.
 The scoped minimatch overrides follow Straggler's toolchain workaround; reassess

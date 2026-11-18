@@ -102,6 +102,10 @@ input/transcription/storage failure, and 2 for empty output.
 - **No matching binary wheel:** check Python version, operating system and CPU
   architecture. Installation uses binary wheels to avoid silently compiling
   inference dependencies. Intel macOS uses a separate compatible ONNX Runtime pin.
+- **`metadata_errors` rejected when starting transcription:** update the source and
+  rerun `npm --prefix transcriber/desktop ci`, then reopen the app. The locked PyAV
+  18 dependency preserves the decoder API required by faster-whisper 1.2.1.
+  Older packaged apps must be rebuilt to include the corrected dependencies.
 - **Internal environment missing:** rerun `npm --prefix transcriber/desktop ci`.
   If an environment is damaged, remove only `transcriber/engine/.venv` and rerun
   installation. Do not remove user caches to fix development dependencies.

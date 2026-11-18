@@ -47,6 +47,34 @@ class EngineTests(unittest.TestCase):
             audio = core.decode_audio_for_transcription(Path("unused.mp3"))
         np.testing.assert_array_equal(audio, [0, 0, -1, 0.5])
 
+    # Decode real codec/container bytes to catch incompatible PyAV APIs without weights.
+    def test_real_mp3_and_mp4_decode_to_finite_mono_16khz(self):
+        import av
+
+        with tempfile.TemporaryDirectory() as temporary:
+            for extension, codec, rate, layout in (("mp3", "mp3", 44100, "mono"), ("mp4", "aac", 48000, "stereo")):
+                with self.subTest(extension=extension):
+                    path = Path(temporary) / f"tone.{extension}"
+                    tone = (np.sin(np.arange(rate // 4) * (2 * np.pi * 440 / rate)) * 8192).astype(np.int16)
+                    samples = tone.reshape(1, -1) if layout == "mono" else np.stack([tone, tone // 2])
+                    with av.open(str(path), mode="w") as container:
+                        stream = container.add_stream(codec, rate=rate)
+                        stream.codec_context.layout = layout
+                        frame = av.AudioFrame.from_ndarray(samples, format="s16p", layout=layout)
+                        frame.sample_rate = rate
+                        for packet in stream.encode(frame):
+                            container.mux(packet)
+                        for packet in stream.encode(None):
+                            container.mux(packet)
+                    audio = core.decode_audio_for_transcription(path)
+                    self.assertEqual(audio.dtype, np.float32)
+                    self.assertEqual(audio.ndim, 1)
+                    self.assertTrue(np.isfinite(audio).all())
+                    self.assertGreater(len(audio), core.AUDIO_SAMPLE_RATE // 5)
+                    self.assertLess(len(audio), core.AUDIO_SAMPLE_RATE // 2)
+                    self.assertGreater(float(np.max(np.abs(audio))), 0.05)
+                    self.assertLessEqual(float(np.max(np.abs(audio))), 1.0)
+
     # Inspection cannot initialize weights or download models, even with a missing cache.
     def test_inspection_and_protocol_output(self):
         with tempfile.TemporaryDirectory() as temporary, patch("socket.socket.connect", side_effect=AssertionError("Network forbidden")):
