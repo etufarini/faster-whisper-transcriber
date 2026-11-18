@@ -1,155 +1,72 @@
+<p align="center">
+  <img src="transcriber/desktop/src-tauri/icons/icon.png" alt="Faster Whisper Transcriber logo" width="96" height="96">
+</p>
+
 # Faster Whisper Transcriber
 
-Local `.mp3` and `.mp4` transcription with [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+Transcribe local MP3 and MP4 recordings on Linux and macOS with faster-whisper.
+Choose a file, a reliability preset and a language, then save the transcription
+as text. Audio and transcripts stay on your computer; models are downloaded only
+when you ask.
 
-This repository provides:
-- a desktop GUI for interactive use;
-- a small CLI for automation;
-- a PyInstaller spec for building a macOS `.app`.
+Faster Whisper Transcriber is written for humans to read, maintain, and improve.
 
-Core properties:
-- fully local processing;
-- no cloud upload;
-- explicit model download and cache paths;
-- simple preset-based operation.
+[<img src="transcriber/docs/screenshots/desktop.png" alt="Native Faster Whisper Transcriber window with an empty local model cache" width="960">](transcriber/docs/screenshots/desktop.png)
 
-## Requirements
+## Availability and requirements
 
-- Python `3.10+`
-- `faster-whisper`
-- `numpy`
-- `PySide6` for the GUI
+**No Tauri desktop release has been published yet.** Run the current app from
+source using the commands below. Native packages include the internal Python
+engine; installed applications need no separate Python service or development
+toolchain. Older PySide6 releases do not contain this desktop rewrite.
 
-Install dependencies:
+The desktop targets Ubuntu 24.04+ and macOS 14+, on x86_64 or ARM64, with a
+graphical session. You need enough RAM and disk space for the selected model.
+A GPU is optional. Model downloads require an internet connection; transcription
+uses only local model files. Windows packages are not currently supported.
 
-```bash
-python3 -m pip install faster-whisper numpy PySide6
-```
+## Run from source
 
-## Quick Start
-
-Clone the repository and run the GUI:
+Install Node.js 22.13+, 24 or 26+, Rust 1.92+ with rustfmt/Clippy, Python 3.12 or
+3.13 with venv support, and the platform's
+[Tauri development prerequisites](https://v2.tauri.app/start/prerequisites/).
+From the repository root, run:
 
 ```bash
-git clone <REPO_URL>
-cd faster-whisper-transcriber
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install faster-whisper numpy PySide6
-python3 transcription_gui.py
+npm --prefix transcriber/desktop ci
+npm --prefix transcriber/desktop run desktop
 ```
 
-## GUI
+`ci` installs JavaScript dependencies and automatically prepares the internal
+Python environment with pinned, hash-verified dependencies. It downloads no models.
+`desktop` opens the native application; Rust starts Python automatically whenever
+needed. There is no additional service command. Use `desktop` again for later
+sessions. If necessary, select an installed interpreter with `TRANSCRIBER_PYTHON`.
 
-The GUI is the main interface.
-
-What it does:
-- lets you pick or drag-and-drop an `.mp3` or `.mp4` file;
-- lets you choose a preset and language;
-- checks whether the required model is available;
-- runs transcription locally with progress reporting;
-- lets you save the resulting text.
-
-Presets:
-- `High` -> `large-v3` + `accurate`
-- `Medium` -> `small` + `balanced`
-- `Low` -> `base` + `fast`
-
-Typical flow:
-1. Select or drop an input file.
-2. Choose a preset and language.
-3. Click `Check model` if the model is missing.
-4. Click `Start transcription`.
-5. Click `Download transcription` to save the result.
-
-Operational notes:
-- transcription starts only when the selected model is already available;
-- bundled models are preferred when the app is run from a packaged macOS app;
-- GUI startup failures are logged to `~/Library/Logs/faster_whisper_transcriber/startup.log`.
-
-## CLI
-
-The CLI is intended for direct and scriptable use.
-
-If the current directory contains exactly one supported input file:
+After development, close the app and reclaim disk space:
 
 ```bash
-python3 transcription_cli.py
+npm --prefix transcriber/desktop run clean
 ```
 
-Common examples:
+This removes only generated Rust files in `src-tauri/target`. Python dependencies,
+models, application data, test evidence and packaging candidates are preserved.
+The next native startup recompiles the removed files.
 
-```bash
-python3 transcription_cli.py --input audio.mp3 --model base --mode fast --lang it
-python3 transcription_cli.py --input audio.mp3 --model small --mode balanced --lang it
-python3 transcription_cli.py --input audio.mp3 --model large-v3 --mode accurate --lang it
-python3 transcription_cli.py --input audio.mp3 --local-files-only
-python3 transcription_cli.py --input audio.mp3 --stdout
-```
+## First launch
 
-Main options:
-- `--input`: input `.mp3` or `.mp4` file;
-- `--output`: output `.txt` file, defaulting to the input basename;
-- `--lang`: language code such as `it` or `en`;
-- `--prompt`: optional contextual prompt;
-- `--model`: Whisper model name;
-- `--mode`: `fast`, `balanced`, or `accurate`;
-- `--model-cache-dir`: model cache directory;
-- `--local-files-only`: refuse model downloads;
-- `--stdout`: also print the transcription to standard output.
+1. Choose or drop an MP3/MP4 recording.
+2. Choose **Reliability** and **Language**. Medium and Italian are the defaults.
+3. If the selected model is missing, select **Download model** and wait for
+   **Available locally**. **Open model folder** shows its cache directory.
+4. Select **Start transcription**. **Stop** cancels the current operation.
+5. Select **Save TXT** to save the result. Changing files or closing with an
+   unsaved result asks before discarding it.
 
-## Model Cache
+Presets retain the original mappings: High uses `large-v3`/accurate, Medium uses
+`small`/balanced, and Low uses `base`/fast. Italian and English are available.
+The original macOS model cache is reused when present.
 
-Default cache locations:
-- GUI: `~/Library/Application Support/faster_whisper_transcriber/models/faster-whisper`
-- CLI: `./models/faster-whisper`
-
-## Prebuilt macOS App
-
-Prebuilt `.app.zip` releases are published on the repository [Releases](../../releases) page.
-
-Recommended install flow:
-1. Download the latest `.app.zip`.
-2. Unzip it.
-3. Move `Faster Whisper Transcriber.app` to `Applications`.
-4. On first launch, right-click and choose `Open`.
-
-## Build macOS App
-
-Build the app with PyInstaller:
-
-```bash
-python3 -m pip install pyinstaller
-PYINSTALLER_CONFIG_DIR=.pyinstaller python3 -m PyInstaller -y faster_whisper_transcriber.spec
-```
-
-Main outputs:
-- `dist/Faster Whisper Transcriber.app`
-- `dist/FasterWhisperTranscriber/`
-
-To bundle already-downloaded models into the app:
-
-```bash
-mkdir -p "dist/Faster Whisper Transcriber.app/Contents/Frameworks/models"
-cp -R "models/faster-whisper" "dist/Faster Whisper Transcriber.app/Contents/Frameworks/models/faster-whisper"
-rm -rf "dist/Faster Whisper Transcriber.app/Contents/Frameworks/models/faster-whisper/.locks"
-codesign --force --deep --sign - "dist/Faster Whisper Transcriber.app"
-```
-
-Distribution notes:
-- Gatekeeper may block the first launch until the app is opened explicitly;
-- public distribution should use proper Apple code signing and notarization.
-
-## Project Layout
-
-- `transcription_core.py`: shared transcription and model-cache logic
-- `transcription_gui.py`: PySide6 desktop application
-- `transcription_cli.py`: command-line entry point
-- `faster_whisper_transcriber.spec`: PyInstaller build spec
-- `resources/`: icons and bundle assets
-- `screenshots/`: GUI screenshots
-
-## License
-
-Apache License 2.0. See [LICENSE](LICENSE).
+See the [user and developer guide](transcriber/docs/guide.md) for the CLI,
+storage, development, tests, packaging and troubleshooting. This project is
+licensed under the [Apache License 2.0](LICENSE).
