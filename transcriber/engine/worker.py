@@ -31,7 +31,7 @@ def emit(output, request_id: int, event: str, **values) -> None:
 
 # Validate literal request data before file access or importing inference libraries.
 def validate_request(request: object) -> dict:
-    if not isinstance(request, dict) or request.get("version") != 1:
+    if not isinstance(request, dict) or type(request.get("version")) is not int or request["version"] != 1:
         raise ValueError("Unsupported worker protocol version.")
     if type(request.get("id")) is not int or request["id"] < 1:
         raise ValueError("Invalid operation identifier.")
@@ -89,8 +89,10 @@ def main() -> int:
         line = sys.stdin.buffer.readline(65537)
         if len(line) > 65536:
             raise ValueError("Worker request exceeds the size limit.")
-        request = validate_request(json.loads(line))
-        request_id = request["id"]
+        decoded = json.loads(line)
+        if isinstance(decoded, dict) and type(decoded.get("id")) is int and decoded["id"] > 0:
+            request_id = decoded["id"]
+        request = validate_request(decoded)
         with contextlib.redirect_stdout(sys.stderr):
             result = execute(request, output)
         emit(output, request_id, "result", **result)

@@ -31,6 +31,8 @@ elif mode == "crash":
     raise SystemExit(7)
 elif mode == "no-result":
     pass
+elif mode == "invalid-result":
+    emit("result", available="not a boolean")
 else:
     if request["action"] == "inspect":
         emit("result", models={"High": True, "Medium": True, "Low": True})

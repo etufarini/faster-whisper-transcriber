@@ -46,6 +46,7 @@ fn validates_worker_protocol_and_recovers_after_failures() {
         ("malformed", Some("Invalid worker output")),
         ("duplicate", Some("after its terminal result")),
         ("no-result", Some("without a result")),
+        ("invalid-result", Some("incomplete or invalid result")),
         ("crash", Some("Synthetic worker crash")),
     ] {
         let (_directory, runtime) = fixture(mode);

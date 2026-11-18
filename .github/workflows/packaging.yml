@@ -1,0 +1,36 @@
+# packaging.yml
+# Build and verify local native candidates without publishing or downloading models.
+name: Optional desktop packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    name: Package on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel] }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: npm, cache-dependency-path: transcriber/desktop/package-lock.json }
+      - uses: actions/setup-python@v6
+        with: { python-version: '3.12', cache: pip, cache-dependency-path: transcriber/engine/requirements.lock }
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libxdo-dev patchelf
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a
+        with: { workspaces: 'transcriber/desktop/src-tauri -> target' }
+      - run: npm --prefix transcriber/desktop ci
+      - run: npm --prefix transcriber/desktop run bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ matrix.os }}
+          path: |
+            transcriber/desktop/packaging/generated/build/release/bundle/deb/*.deb
+            transcriber/desktop/packaging/generated/build/release/bundle/dmg/*.dmg
+          if-no-files-found: error

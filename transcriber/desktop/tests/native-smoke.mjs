@@ -57,6 +57,8 @@ Object.assign(environment, {
   TRANSCRIBER_FIXTURE_RECORD: record,
   TAURI_WEBDRIVER_PORT: String(await freePort()),
 });
+if (process.platform === 'linux')
+  Object.assign(environment, { LIBGL_ALWAYS_SOFTWARE: '1', WEBKIT_DISABLE_COMPOSITING_MODE: '1' });
 if (mode === 'real-engine') delete environment.TRANSCRIBER_TEST_WORKER;
 if (mode === 'broken-initialization') environment.TRANSCRIBER_TEST_CACHE = 'invalid relative cache';
 let log = '';
@@ -74,8 +76,9 @@ app.stderr.on('data', (chunk) => {
 const driver = `http://127.0.0.1:${environment.TAURI_WEBDRIVER_PORT}`;
 let session;
 
-// Keep driver errors explicit; only startup connection refusal is a readiness condition.
-async function request(method, endpoint, body, timeout = 10000) {
+// The driver allows 30s scripts; the transport deadline must leave it time to report errors.
+// Only startup connection refusal is a readiness condition, never a reason to retry assertions.
+async function request(method, endpoint, body, timeout = 35000) {
   const response = await fetch(driver + endpoint, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -176,8 +179,14 @@ try {
         /absolute path/,
       );
     }
-    await invoke('plugin:event|emit', { event: 'tauri://close-requested', payload: null });
+    // A clean close can destroy WebDriver before this IPC call's reply is delivered.
+    try {
+      await invoke('plugin:event|emit', { event: 'tauri://close-requested', payload: null });
+    } catch (error) {
+      if (!['UND_ERR_SOCKET', 'ECONNREFUSED'].includes(error.cause?.cause?.code)) throw error;
+    }
     await until(() => app.exitCode !== null || app.signalCode !== null, 'application shutdown');
+    assert.equal(app.exitCode, 0);
     console.log(`PASS: native ${mode} opens and closes correctly without models.`);
   } else {
     await status('Ready');

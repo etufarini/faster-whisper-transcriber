@@ -155,6 +155,7 @@ fn monitor(
                 match message["event"].as_str() {
                     Some("progress") => progress(message),
                     Some("result") => {
+                        validate_result(request, &message)?;
                         terminal = Some(message);
                         terminal_at = Some(Instant::now());
                     }
@@ -180,5 +181,29 @@ fn monitor(
             }
             thread::sleep(Duration::from_millis(10));
         }
+    }
+}
+
+// Do not pass incomplete or mistyped terminal data into renderer configuration.
+fn validate_result(request: &Value, message: &Value) -> Result<()> {
+    let valid = match request["action"].as_str() {
+        Some("inspect") => serde_json::from_str::<Value>(crate::PRESETS)
+            .map_err(|error| error.to_string())?
+            .as_object()
+            .is_some_and(|presets| {
+                presets
+                    .keys()
+                    .all(|name| message["models"][name].is_boolean())
+            }),
+        Some("download") => message["available"] == true,
+        Some("transcribe") => message["text"]
+            .as_str()
+            .is_some_and(|text| !text.trim().is_empty()),
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err("The worker returned an incomplete or invalid result.".into())
     }
 }
