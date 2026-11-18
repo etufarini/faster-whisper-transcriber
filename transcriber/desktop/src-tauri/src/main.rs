@@ -216,7 +216,7 @@ fn main() {
         .build(context)
         .expect("Could not start Faster Whisper Transcriber");
     app.run(|handle, event| {
-        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+        if let tauri::RunEvent::ExitRequested { ref api, .. } = event {
             if let Ok(runtime) = &handle.state::<Application>().0 {
                 if !runtime.can_exit() {
                     api.prevent_exit();

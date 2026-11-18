@@ -1,0 +1,60 @@
+{
+  "name": "faster-whisper-transcriber-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/setup-engine.mjs",
+    "desktop": "tauri dev",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "bundle": "node packaging/bundle.mjs",
+    "clean": "cargo clean --offline --locked --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target",
+    "test": "vitest run tests/*.test.ts",
+    "test:runtime": "cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features",
+    "test:e2e": "playwright test",
+    "test:native": "npm run build && cargo build --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol,native-tests && node tests/native-smoke.mjs",
+    "format": "prettier --write src scripts packaging/*.mjs tests *.ts *.json eslint.config.js",
+    "format:check": "prettier --check src scripts packaging/*.mjs tests *.ts *.json eslint.config.js",
+    "lint": "eslint src tests scripts packaging/*.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^10.14.0",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^7.3.8",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "eslint@^10.14.0": {
+      "minimatch": "11.0.8"
+    },
+    "@eslint/config-array@0.23.5": {
+      "minimatch": "11.0.8"
+    },
+    "@typescript-eslint/typescript-estree@8.72.2": {
+      "minimatch": "11.0.8"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
