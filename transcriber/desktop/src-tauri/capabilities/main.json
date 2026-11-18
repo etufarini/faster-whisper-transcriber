@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Native dialogs, events and explicit window destruction after worker shutdown.",
+  "windows": ["main"],
+  "permissions": ["core:event:default", "core:window:allow-destroy", "dialog:allow-open", "dialog:allow-save"]
+}
