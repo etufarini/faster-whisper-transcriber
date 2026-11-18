@@ -19,7 +19,7 @@ writeFileSync(
 );
 const result = spawnSync(
   path.join(desktop, 'node_modules/.bin/tauri'),
-  ['build', '--config', config, ...process.argv.slice(2)],
+  ['build', '--features', 'custom-protocol', '--config', config, ...process.argv.slice(2)],
   {
     cwd: desktop,
     stdio: 'inherit',

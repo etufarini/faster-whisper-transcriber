@@ -11,12 +11,14 @@ export default function ModelPanel({
   preset,
   busy,
   onDownload,
+  onCheck,
   onOpen,
 }: {
   config: Configuration | null;
   preset: Preset;
   busy: boolean;
   onDownload: () => void;
+  onCheck: () => void;
   onOpen: () => void;
 }) {
   const available = config?.models[preset];
@@ -37,8 +39,8 @@ export default function ModelPanel({
           </button>
         )}
       </div>
-      <button disabled={busy || !config || available} onClick={onDownload}>
-        {available ? 'Model ready' : 'Download model'}
+      <button disabled={busy || !config} onClick={available ? onCheck : onDownload}>
+        {available ? 'Check model' : 'Download model'}
       </button>
     </section>
   );

@@ -301,6 +301,7 @@ export default function App() {
         preset={preset}
         busy={busy}
         onDownload={() => void run('download')}
+        onCheck={() => void retry()}
         onOpen={() => void desktop.openModelFolder().catch(report)}
       />
       {error && (
