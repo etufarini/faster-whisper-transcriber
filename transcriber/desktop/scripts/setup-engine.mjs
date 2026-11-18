@@ -29,16 +29,16 @@ function run(program, args) {
 function findPython() {
   const candidates = process.env.TRANSCRIBER_PYTHON
     ? [process.env.TRANSCRIBER_PYTHON]
-    : ['python3.12', 'python3.13', 'python3.14', 'python3'];
+    : ['python3.12', 'python3.13', 'python3'];
   for (const candidate of candidates) {
     const result = spawnSync(candidate, [
       '-c',
-      'import sys;sys.exit(not ((3,12) <= sys.version_info[:2] < (3,15)))',
+      'import sys;sys.exit(not ((3,12) <= sys.version_info[:2] < (3,14)))',
     ]);
     if (!result.error && result.status === 0) return candidate;
   }
   throw new Error(
-    'Install Python 3.12–3.14 with venv support, or set TRANSCRIBER_PYTHON to its executable.',
+    'Install Python 3.12 or 3.13 with venv support, or set TRANSCRIBER_PYTHON to its executable.',
   );
 }
 

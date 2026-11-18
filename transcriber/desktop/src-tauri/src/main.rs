@@ -46,13 +46,19 @@ async fn perform(
 // Signal the owned operation; the performing thread remains responsible for reaping.
 #[tauri::command]
 fn cancel_operation(state: State<'_, Application>) -> Result<()> {
-    runtime(&state)?.cancel()
+    match &state.0 {
+        Ok(runtime) => runtime.cancel(),
+        Err(_) => Ok(()),
+    }
 }
 
 // Await owned-child cleanup before the renderer destroys the native window.
 #[tauri::command]
 async fn shutdown(state: State<'_, Application>) -> Result<()> {
-    let runtime = runtime(&state)?;
+    let Ok(runtime) = &state.0 else {
+        return Ok(());
+    };
+    let runtime = runtime.clone();
     tauri::async_runtime::spawn_blocking(move || runtime.shutdown())
         .await
         .map_err(|e| e.to_string())?
@@ -180,15 +186,52 @@ fn watch_signals(handle: tauri::AppHandle, runtime: Arc<Runtime>) {
     });
 }
 
+// Verify exactly the installed resource lookup, with no source or development fallback.
+fn check_package(context: &tauri::Context<tauri::Wry>) -> Result<()> {
+    if context.assets().get(&"index.html".into()).is_none() {
+        return Err("The embedded interface is missing.".into());
+    }
+    let resources =
+        tauri::utils::platform::resource_dir(context.package_info(), &tauri::Env::default())
+            .map_err(|error| error.to_string())?;
+    let program = resources.join("engine/transcriber-engine");
+    if !program.is_file() {
+        return Err(format!(
+            "The installed engine is missing at {}",
+            program.display()
+        ));
+    }
+    let temporary = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let runtime = Runtime::new(
+        Engine {
+            program,
+            arguments: vec![],
+        },
+        temporary.path().join("models"),
+    )?;
+    let inspection = runtime.inspect()?;
+    if inspection["models"]
+        .as_object()
+        .is_none_or(|models| models.values().any(|value| value != false))
+    {
+        return Err("The isolated packaged engine reported unexpected model availability.".into());
+    }
+    runtime.shutdown()?;
+    println!(
+        "Faster Whisper Transcriber {}: embedded frontend and installed engine verified",
+        env!("CARGO_PKG_VERSION")
+    );
+    Ok(())
+}
+
 // Register only narrow application commands; automation exists solely in debug tests.
 fn main() {
     let context = tauri::generate_context!();
     if std::env::args().nth(1).as_deref() == Some("--check-package") {
-        if context.assets().get(&"index.html".into()).is_none() {
-            eprintln!("The embedded interface is missing.");
+        if let Err(error) = check_package(&context) {
+            eprintln!("{error}");
             std::process::exit(1);
         }
-        println!("Faster Whisper Transcriber {}", env!("CARGO_PKG_VERSION"));
         return;
     }
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());

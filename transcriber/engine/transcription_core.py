@@ -10,6 +10,7 @@ stay small, explicit, and easy to reason about.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -42,12 +43,12 @@ def find_single_audio_file(cwd: Path) -> Path:
     )
     if not candidates:
         raise FileNotFoundError(
-            "Nessun file audio/video supportato trovato nella cartella corrente (.mp3, .mp4)."
+            "No supported media file was found in this directory (.mp3, .mp4)."
         )
     if len(candidates) > 1:
         names = ", ".join(path.name for path in candidates)
         raise RuntimeError(
-            f"Trovati più file supportati ({names}). Usa --input per specificarne uno."
+            f"Multiple media files found ({names}). Select one using --input."
         )
     return candidates[0]
 
@@ -133,15 +134,18 @@ def transcribe_with_faster_whisper(
     from faster_whisper import WhisperModel  # type: ignore
 
     device, compute_type = transcription_device()
-    model = WhisperModel(
-        model_name,
-        device=device,
-        compute_type=compute_type,
-        download_root=str(model_cache_dir),
-        local_files_only=local_files_only,
-    )
+    options = dict(device=device, compute_type=compute_type,
+                   download_root=str(model_cache_dir), local_files_only=local_files_only)
+    try:
+        model = WhisperModel(model_name, **options)
+    except RuntimeError as error:
+        if device != "cuda":
+            raise
+        print(f"CUDA model initialization failed; trying CPU: {error}", file=sys.stderr)
+        options.update(device="cpu", compute_type="int8_float32")
+        model = WhisperModel(model_name, **options)
     if is_cancel_requested(cancel_check):
-        raise InterruptedError("Trascrizione interrotta.")
+        raise InterruptedError("Transcription cancelled.")
 
     beam_size, best_of, patience, temperatures = get_mode_decoding_params(mode)
     audio = decode_audio_for_transcription(audio_path)
@@ -168,7 +172,7 @@ def transcribe_with_faster_whisper(
     parts: list[str] = []
     for segment in segments:
         if is_cancel_requested(cancel_check):
-            raise InterruptedError("Trascrizione interrotta.")
+            raise InterruptedError("Transcription cancelled.")
         if progress_callback and duration_sec > 0:
             progress = int(min(100.0, max(0.0, (float(segment.end) / duration_sec) * 100.0)))
             if progress != last_reported:
@@ -179,7 +183,7 @@ def transcribe_with_faster_whisper(
             parts.append(text)
 
     if is_cancel_requested(cancel_check):
-        raise InterruptedError("Trascrizione interrotta.")
+        raise InterruptedError("Transcription cancelled.")
     if progress_callback and last_reported < 100:
         progress_callback(100)
     return "\n".join(parts).strip()

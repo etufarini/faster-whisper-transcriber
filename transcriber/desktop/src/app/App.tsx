@@ -35,6 +35,7 @@ export default function App() {
   const active = useRef(true);
   const mounted = useRef(true);
   const pending = useRef<Promise<void> | null>(null);
+  const closing = useRef(false);
   const selectRef = useRef<(path: string) => void>(() => {});
   const closeRef = useRef<() => void>(() => {});
 
@@ -85,7 +86,7 @@ export default function App() {
 
   // Selecting a new file preserves an unsaved result unless the user discards it.
   function select(path: string) {
-    if (active.current) return;
+    if (active.current || decision) return;
     if (!supportedInput(path)) {
       setError('Choose an MP3 or MP4 file.');
       return;
@@ -159,7 +160,7 @@ export default function App() {
         }
       } finally {
         active.current = false;
-        if (mounted.current) {
+        if (mounted.current && !closing.current) {
           setBusy(false);
           setStopping(false);
         }
@@ -200,26 +201,36 @@ export default function App() {
     active.current = true;
     setBusy(true);
     setError('');
-    try {
-      if (await desktop.saveTranscript(input, text)) {
-        setSaved(true);
-        setStatus('Transcription saved');
+    // Keep export lifetime visible to shutdown, including a pending native save dialog.
+    async function exportText() {
+      try {
+        if (await desktop.saveTranscript(input!, text)) {
+          setSaved(true);
+          setStatus('Transcription saved');
+        }
+      } catch (failure) {
+        report(failure);
+      } finally {
+        active.current = false;
+        if (!closing.current) setBusy(false);
       }
-    } catch (failure) {
-      report(failure);
-    } finally {
-      active.current = false;
-      setBusy(false);
     }
+    pending.current = exportText();
+    await pending.current;
   }
 
   // Native shutdown waits for the active invocation before destroying the window.
   async function finishClose() {
+    if (closing.current) return;
+    closing.current = true;
     try {
       await desktop.cancel();
       await pending.current;
       await desktop.close();
     } catch (failure) {
+      closing.current = false;
+      active.current = false;
+      setBusy(false);
       report(failure);
     }
   }

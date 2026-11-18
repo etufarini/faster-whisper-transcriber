@@ -1,1 +1,1 @@
-{ "bundle": { "targets": ["app", "dmg"], "macOS": { "minimumSystemVersion": "13.5" } } }
+{ "bundle": { "targets": ["app", "dmg"], "macOS": { "minimumSystemVersion": "14.0" } } }

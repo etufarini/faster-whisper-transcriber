@@ -16,7 +16,7 @@
     "test": "vitest run tests/*.test.ts",
     "test:runtime": "cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features",
     "test:e2e": "playwright test",
-    "test:native": "npm run build && cargo build --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol,native-tests && node tests/native-smoke.mjs",
+    "test:native": "npm run build && cargo build --locked --manifest-path src-tauri/Cargo.toml --features custom-protocol,native-tests && node tests/native-smoke.mjs && node tests/native-smoke.mjs real-engine && node tests/native-smoke.mjs broken-initialization",
     "format": "prettier --write src scripts packaging/*.mjs tests *.ts *.json eslint.config.js",
     "format:check": "prettier --check src scripts packaging/*.mjs tests *.ts *.json eslint.config.js",
     "lint": "eslint src tests scripts packaging/*.mjs",
