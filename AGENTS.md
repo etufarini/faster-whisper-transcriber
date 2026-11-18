@@ -1,123 +1,122 @@
-# AGENTS.md
+# Faster Whisper Transcriber development instructions
 
-## Purpose
-This repository should be developed in this style: 
+## Purpose and boundaries
 
-small understandable programs, direct designs, explicit invariants, low accidental complexity, and strong control over what the software is doing at every level.
+Faster Whisper Transcriber is a local MP3/MP4 transcription application using
+faster-whisper. Target Linux and macOS with Tauri 2, React and TypeScript. Preserve
+the High/Medium/Low presets, Italian/English selection, explicit model downloads,
+progress, cancellation and TXT exports. Keep the Python CLI for automation.
+Do not introduce cloud transcription, a persistent server, history or queues
+without an approved scope. Comments, UI messages and documentation are in English.
+Development and required checks need no GPU, model weights or inference service.
+Real inference and hardware checks are separate integration diagnostics.
 
-## Core philosophy
-- Prefer simple, direct, self-contained solutions.
-- Optimize for understandability first, then for performance where it matters.
-- Treat unnecessary complexity as a design bug.
-- If a small non-essential feature adds disproportionate complexity, cut or defer it.
-- Favor designs that can be reasoned about locally.
-- Keep the amount of moving parts low.
-- Build software that a skilled programmer can still hold in their head.
+## Human-readable code
 
-## AI operating mode
-- Do not "vibe code".
-- The AI must stay under explicit human or repository intent, not invent its own product direction.
-- Before changing code, reconstruct the design constraints, invariants, and success criteria from the existing code and docs.
-- When solving non-trivial tasks, first summarize the intended design in a few precise bullets, then implement.
-- Prefer partial but well-understood progress over broad speculative rewrites.
-- Avoid producing large refactors unless they remove clear complexity or fix a structural problem.
-- Do not introduce abstraction layers, frameworks, helpers, or dependencies unless they remove more complexity than they add.
-- Keep the human/reviewer in the loop: expose trade-offs, assumptions, invariants, and risks.
-- When context is missing, ask for it or state the missing assumptions explicitly.
+Write small, direct programs for human maintainers. Prefer explicit control flow,
+descriptive names, focused modules and locally understandable invariants. Avoid
+speculative abstractions, frameworks, dependencies and unrelated refactors.
+Before editing, identify constraints, invariants, the simplest change and its risk.
+Make ownership and failure paths explicit. Keep JSX multiline and operations named.
 
-## Design rules
-- Start from the most direct working model.
-- Use small proof-of-concept implementations to validate ideas before generalizing.
-- If the design feels wrong, refactor the design instead of piling on compensating code.
-- Prefer one good data representation over many conversion layers.
-- Push complexity to the edges; keep the central path obvious.
-- Eliminate special cases where possible by choosing better representations.
-- Keep interfaces narrow and predictable.
-- Use opaque types when they protect invariants and reduce coupling.
-- Make ownership, lifetime, and mutation boundaries explicit.
-- In C code, always reason about memory layout, aliasing, lifetimes, and failure paths.
+Every named function/method needs a purpose/behavior comment immediately above it.
+Begin each source file with one multiline comment containing its name and purpose.
+Use consecutive comment lines for shell/TOML. JSON and generated lockfiles cannot
+contain comments. Explain guarantees and trade-offs, not obvious statements.
+Do not retain commented-out code or stale TODO/FIXME notes. After development,
+remove redundant code/dependencies within the approved scope, report cleanup,
+and explain any necessary complexity. Keep builds warning-free.
 
-## Code structure
-- Functions should do one coherent thing.
-- Prefer small and medium-sized functions with a clear operational purpose.
-- Keep related statements physically close.
-- Avoid deep nesting when a clearer control flow is possible.
-- Use straightforward control flow; cleverness must pay for itself.
-- Minimize hidden state.
-- Minimize global state unless it materially simplifies the design.
-- Prefer explicit data flow over implicit side effects.
+## Repository structure
 
-## Naming and style
-- Use clear English names for functions, variables, comments, and public APIs.
-- Prefer names that reveal the role in the design, not just the local implementation detail.
-- Keep formatting readable and intentional.
-- Favor consistency over personal flourishes that reduce clarity.
-- Do not compress code for brevity if it harms readability.
-- In new C refactors, prefer direct and readable local naming (for example `path`, `size`, `line`) instead of Hungarian prefixes, except for public legacy APIs.
+Keep the visible root limited to README.md, AGENTS.md, LICENSE and transcriber/.
+Keep desktop code in transcriber/desktop/, Python engine/CLI in transcriber/engine/,
+the runner in transcriber/tests/run.sh and documentation in transcriber/docs/.
+Frontend modules separate app composition, features, shared controls and domain
+data. All IPC, native dialogs and window events belong in services/desktop.ts.
+Keep commands thin. Rust owns validation, paths, exports, operation state, process
+supervision and shutdown. Native logic must be testable without the desktop feature.
 
-## Comments and documentation
-- Write comments for the future reader.
-- Comments should explain purpose, guarantees, invariants, side effects, representation choices, and non-obvious trade-offs.
-- Function comments should primarily explain why plus invariants, guarantees, and fallback behavior, not merely restate the code.
-- Every method/function must have a comment immediately above its declaration or definition explaining purpose and behavior.
-- At the beginning of every file there must be a multiline comment containing the file name and a general description of what the file does.
-- Use guide comments to separate meaningful sections of logic when that improves navigation.
-- Do not write trivial comments that merely restate the code.
-- Avoid redundant introductory comment layers: a single file header comment should remain the primary source of context.
-- Avoid stale TODO/FIXME debt comments; either fix the issue, document it properly, or open an issue.
-- Never keep old code as commented-out backup.
-- Prefer top-of-file or top-of-module design notes when a subsystem needs conceptual framing.
+Python is an internal engine, not an independently managed service. Use one child
+per operation and a versioned JSON-lines protocol over pipes. Worker stdout is
+protocol only; stderr is diagnostics. Start programs directly with argument arrays,
+never shell commands. Resolve packaged resources independently of the working
+directory. Introduce platform modules only for actual platform differences.
 
-## Error handling and debugging
-- Make failure modes explicit.
-- Check return values where failure is possible and relevant.
-- Fail loudly when an invariant is broken.
-- Add debugging aids that increase observability without obscuring the main logic.
-- Debug incrementally: gather state, narrow hypotheses, and preserve reproducibility.
-- When documenting tricky logic, use comments as an analysis tool to verify the design.
+## Configuration and compatibility
 
-## C-specific guidance
-- Compile with strict warnings enabled and keep the code warning-free.
-- Be explicit about ownership: who allocates, who retains, who releases.
-- If using reference counting, initialize newly created owned objects in a state that matches immediate ownership.
-- Prefer representations that are binary-safe when the domain requires it.
-- Use structs to encode real invariants, not just to group fields mechanically.
-- Use pointer arithmetic only when the representation is crystal clear.
-- Treat low-level tricks as justified only when they materially improve the design.
-- When using system interfaces, distinguish clearly between language, standard library, and operating-system services.
+Preserve preset/model/decoding mappings and CLI flags. Share owning definitions
+with frontend fixtures rather than copying rules. Validate at native and engine
+boundaries. Snapshot options at start. Never infer CUDA availability solely from
+CUDA_VISIBLE_DEVICES; CPU operation must remain possible without CUDA.
+Use platform-appropriate storage and reuse the existing macOS model cache without
+copying/merging it. Resolve required files before declaring a model available.
+Transcription is local-files-only; downloading is a separate explicit action.
+Keep original data on failures and write TXT exports atomically.
 
-## Performance rules
-- Do not optimize blindly.
-- First choose a design that is small, correct, and inspectable.
-- Optimize after identifying the real bottleneck.
-- Prefer structural performance wins over micro-optimizations.
-- If a simpler design is fast enough, stop there.
+## Desktop behavior and data
 
-## Change policy for the AI
-- Before editing, identify:
-  - the invariant that must remain true;
-  - the simplest viable change;
-  - the main risk introduced by the change.
-- After editing, verify:
-  - correctness;
-  - warning-free build;
-  - consistency with surrounding style;
-  - whether the change reduced or increased conceptual complexity.
-- If complexity increased, explain why it was unavoidable.
-- If a feature request conflicts with simplicity, propose a reduced version first.
+Enforce one download/transcription operation at a time in Rust. Identify each
+operation and reject stale events. Retain child ownership through cancellation
+until exit and reaping. Clean up only owned children. Ask before discarding an
+unsaved result or interrupting active work. Report missing native services,
+dependencies/models, decoding errors, crashes and export failures explicitly.
+Fixtures are development-only, visibly labelled and excluded from release assets.
+Preserve keyboard access, focus, contrast and reduced motion. Keep the interface
+focused on choosing a file/options, preparing a model, transcribing and saving.
 
-## Non-goals
-- Do not add fashionable abstractions just because they are common.
-- Do not maximize generality in advance.
-- Do not treat indirection as automatically elegant.
-- Do not preserve a bad design for compatibility with a local mistake if a clearer redesign is possible.
-- Do not generate code the AI itself cannot explain line by line.
+## Development and distribution
 
-## Preferred outcome
-The final code should feel:
-- small enough to inspect;
-- clear enough to explain;
-- direct enough to trust;
-- explicit enough to debug;
-- simple enough to evolve.
+Use installed Node/npm, Rust, Python and platform prerequisites. The local flow is
+npm --prefix transcriber/desktop ci followed by npm --prefix transcriber/desktop
+run desktop. The install hook prepares a local Python environment with pinned
+dependencies. It must not install system packages, fetch toolchains or load/download
+models. Document the Python prerequisite. Rust launches the engine automatically;
+no separate service command or backend selection is needed.
+Packages include Python, faster-whisper, native libraries, licenses and dependency
+provenance. Installed startup must not invoke pip, compile or need Python/Node/Rust
+from PATH. Build on matching operating systems/architectures and verify resources
+and dynamic dependencies. Ad hoc signing is not signing for public distribution
+or notarization. Preparing packages does not publish them.
 
+## Verification
+
+Use bash transcriber/tests/run.sh as the complete entry point. Keep focused common,
+frontend, runtime, browser, native and packaging suites. Use temporary directories,
+synthetic data and fake workers; never personal configuration/models, system
+package installation or inference/model services. Support macOS Bash 3.2 and report
+skips. Test protocol, validation, atomic storage and process ownership at the
+cheapest effective level; browser tests cover renderer flows, native tests actual
+WebView/IPC/processes. Cover cancellation, crashes, incomplete models, paths with
+spaces and failed writes. Mocks do not establish inference quality or OS permissions.
+
+Keep one required workflow with three jobs: Linux frontend/browser, native Linux
+and native macOS. Keep native smoke paths short. Packaging is separate and must
+be checked when its boundaries change. Retain failure evidence. Prefer readiness
+conditions to fixed sleeps/retries. Run format/lint/types, rustfmt/Clippy with denied
+warnings and affected suites first. Never weaken assertions or bypass CI failures.
+Use limited debug information and disable incremental development compilation.
+After final native checks, close processes and run npm --prefix transcriber/desktop
+run clean. Clean only src-tauri/target, ignoring external target overrides. Preserve
+Python environments, models, user data, npm dependencies, evidence and packaging
+candidates. Do not immediately rebuild or clean between dependent CI checks.
+
+## Documentation and releases
+
+Follow Straggler's README structure: introduction and human-maintainer principle,
+availability/requirements, run from source, first launch, and a link to the guide.
+Keep architecture, CLI, development, data, troubleshooting and packaging in
+transcriber/docs/guide.md. The desktop README documents commands and test contracts.
+Use real screenshots without fabricated readiness/transcriptions or private paths.
+Keep the existing product identity. main is development; merging does not publish.
+Do not advertise Tauri packages before publication. Preserve existing tags/releases.
+Approve the exact version, candidate SHA and notes before tagging/publishing.
+Do not delete remote branches without approval.
+
+## Approval
+
+Every modification requires explicit approval of the proposed scope, including
+instructions, renames and deletions. Existing approval persists for the presented
+work and included cleanup; do not repeatedly request it. Read-only investigation
+is allowed. Present out-of-scope additions before applying them. The approved
+rewrite includes npm-integrated Python, docs, tests, packaging and removal of Qt.

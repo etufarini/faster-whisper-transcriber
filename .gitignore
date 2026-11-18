@@ -1,0 +1,12 @@
+# Local dependencies, generated builds and Python environments.
+node_modules/
+dist/
+target/
+.venv/
+__pycache__/
+*.py[cod]
+src-tauri/gen/
+packaging/generated/
+playwright-report/
+test-results/
+.DS_Store
